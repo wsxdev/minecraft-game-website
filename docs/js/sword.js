@@ -32,12 +32,12 @@ export class DiamondSword {
     this.camera.add(this.swordLight);
 
     const swordPoint = new THREE.PointLight(0x55ffff, 1.5, 3.0);
-    swordPoint.position.set(0.3, -0.1, -0.4);
+    swordPoint.position.set(0.28, -0.08, -0.40);
     this.camera.add(swordPoint);
 
-    // Default rest transforms in camera space (lower-right corner, vertical Minecraft sword)
-    this.idlePos = new THREE.Vector3(0.28, -0.24, -0.46);
-    this.idleRot = new THREE.Euler(-0.18, -0.20, -0.05, 'YXZ');
+    // Default rest transforms in camera space (lower-right corner, fully visible diamond sword)
+    this.idlePos = new THREE.Vector3(0.25, -0.21, -0.44);
+    this.idleRot = new THREE.Euler(-0.16, -0.22, -0.10, 'YXZ');
 
     this.container.position.copy(this.idlePos);
     this.pivot.rotation.copy(this.idleRot);
@@ -68,27 +68,27 @@ export class DiamondSword {
     this.fallbackGroup = new THREE.Group();
 
     // Diamond blade
-    const bladeGeo = new THREE.BoxGeometry(0.08, 0.52, 0.025);
+    const bladeGeo = new THREE.BoxGeometry(0.045, 0.23, 0.02);
     const bladeMat = new THREE.MeshLambertMaterial({
       color: 0x4df2ff,
       emissive: 0x114455,
       emissiveIntensity: 0.35
     });
     const blade = new THREE.Mesh(bladeGeo, bladeMat);
-    blade.position.y = 0.26;
+    blade.position.y = 0.115;
     this.fallbackGroup.add(blade);
 
     // Crossguard
-    const guardGeo = new THREE.BoxGeometry(0.22, 0.05, 0.04);
+    const guardGeo = new THREE.BoxGeometry(0.12, 0.025, 0.03);
     const guardMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
     const guard = new THREE.Mesh(guardGeo, guardMat);
     this.fallbackGroup.add(guard);
 
     // Wooden handle
-    const hiltGeo = new THREE.BoxGeometry(0.05, 0.16, 0.03);
+    const hiltGeo = new THREE.BoxGeometry(0.028, 0.07, 0.022);
     const hiltMat = new THREE.MeshLambertMaterial({ color: 0x8a5b29 });
     const hilt = new THREE.Mesh(hiltGeo, hiltMat);
-    hilt.position.y = -0.10;
+    hilt.position.y = -0.045;
     this.fallbackGroup.add(hilt);
 
     this.swordWrapper.add(this.fallbackGroup);
@@ -105,10 +105,12 @@ export class DiamondSword {
         const box = new THREE.Box3().setFromObject(loadedModel);
         const size = new THREE.Vector3();
         box.getSize(size);
-        const maxDim = Math.max(size.x, size.y) || 25;
+        const diagonalLength = Math.hypot(size.x, size.y) || 42.4;
 
-        // Scale sword to standard first-person viewmodel length (~0.58 units)
-        const scale = 0.58 / maxDim;
+        // Scale sword to authentic Minecraft first-person viewmodel length (~0.30 units)
+        // so the full sword (handle, crossguard, blade, and tip) is completely visible in screen
+        const targetLength = 0.30;
+        const scale = targetLength / diagonalLength;
         loadedModel.scale.setScalar(scale);
 
         // Center bottom pommel at (0, 0, 0)
