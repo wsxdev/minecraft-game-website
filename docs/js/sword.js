@@ -35,9 +35,9 @@ export class DiamondSword {
     swordPoint.position.set(0.3, -0.1, -0.4);
     this.camera.add(swordPoint);
 
-    // Default rest transforms in camera space (lower-right corner, clearly visible!)
-    this.idlePos = new THREE.Vector3(0.28, -0.26, -0.48);
-    this.idleRot = new THREE.Euler(-0.25, -0.32, -0.22, 'YXZ');
+    // Default rest transforms in camera space (lower-right corner, vertical Minecraft sword)
+    this.idlePos = new THREE.Vector3(0.28, -0.24, -0.46);
+    this.idleRot = new THREE.Euler(-0.18, -0.20, -0.05, 'YXZ');
 
     this.container.position.copy(this.idlePos);
     this.pivot.rotation.copy(this.idleRot);
@@ -131,9 +131,9 @@ export class DiamondSword {
           }
         });
 
-        // Rotate wrapper so blade points up-left comfortably
+        // Rotate wrapper so blade points vertically upward in first-person
         const gltfOrient = new THREE.Group();
-        gltfOrient.rotation.z = -0.45;
+        gltfOrient.rotation.z = Math.PI * 0.25;
         gltfOrient.add(loadedModel);
 
         // Remove fallback and attach high-res GLTF model
