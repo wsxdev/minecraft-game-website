@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 /**
- * Mob Manager for Creeper, Skeleton, and Wither
- * Handles mob spawning, procedural animations, AI attack patterns,
- * hit detection, red damage flash, knockback, and death animations.
+ * Mob Manager for Creeper and Skeleton
+ * Handles mob spawning, procedural walking animations, AI attack patterns,
+ * hit detection with raycasting, red damage flash, knockback, and death animations.
  */
 export class MobManager {
   constructor(scene, world, sounds) {
@@ -21,16 +21,15 @@ export class MobManager {
     // Callbacks for game loop
     this.onPlayerDamage = null;
     this.onMobKilled = null;
-    this.onBossHealthChange = null;
+    this.onLoadedCallback = null;
 
     this.preloadTemplates();
   }
 
   async preloadTemplates() {
     const list = [
-      { name: 'creeper', path: 'models/creeper/scene.gltf', targetHeight: 1.95 },
-      { name: 'skeleton', path: 'models/skeleton/scene.gltf', targetHeight: 2.1 },
-      { name: 'wither', path: 'models/wither/scene.gltf', targetHeight: 2.7 }
+      { name: 'creeper', path: 'models/creeper/scene.gltf', targetHeight: 1.95, rotateY: Math.PI },
+      { name: 'skeleton', path: 'models/skeleton/scene.gltf', targetHeight: 2.1, rotateY: 0 }
     ];
 
     let loadedCount = 0;
@@ -53,6 +52,11 @@ export class MobManager {
         model.position.x = -center.x * scale;
         model.position.y = -box.min.y * scale;
         model.position.z = -center.z * scale;
+
+        // Rotate Creeper 180 degrees so its face points towards +Z (directly at the player!)
+        if (item.rotateY) {
+          model.rotation.y = item.rotateY;
+        }
 
         // Ensure materials allow custom colors & shadows
         model.traverse((child) => {
@@ -77,7 +81,6 @@ export class MobManager {
         loadedCount++;
       } catch (err) {
         console.error(`Error loading model ${item.name}:`, err);
-        // Create procedural fallback
         this.templates[item.name] = this.createFallbackTemplate(item.name, item.targetHeight);
         loadedCount++;
       }
@@ -95,7 +98,6 @@ export class MobManager {
     const root = new THREE.Group();
     let color = 0x55aa33;
     if (type === 'skeleton') color = 0xdddddd;
-    if (type === 'wither') color = 0x222222;
 
     const bodyGeo = new THREE.BoxGeometry(height * 0.35, height * 0.7, height * 0.25);
     const bodyMat = new THREE.MeshLambertMaterial({ color });
@@ -113,6 +115,11 @@ export class MobManager {
   }
 
   spawnMob(type, x, z, difficulty) {
+    // Only Creeper and Skeleton allowed
+    if (type !== 'creeper' && type !== 'skeleton') {
+      type = Math.random() < 0.6 ? 'creeper' : 'skeleton';
+    }
+
     if (!this.templates[type]) return null;
 
     const tmpl = this.templates[type];
@@ -134,7 +141,6 @@ export class MobManager {
 
     const id = this.nextMobId++;
 
-    // Mob stats based on type & difficulty
     let maxHealth = 20;
     let speed = 2.4;
     let pointValue = 100;
@@ -149,12 +155,6 @@ export class MobManager {
       maxHealth = 25;
       speed = 1.9 * (difficulty.mobSpeedMultiplier || 1);
       pointValue = 200;
-    } else if (type === 'wither') {
-      maxHealth = 180 * (difficulty.bossHealthMultiplier || 1);
-      speed = 1.4;
-      pointValue = 1500;
-      group.position.y = 3.2; // Wither floats
-      this.sounds.playWitherRoar();
     }
 
     const mob = {
@@ -168,21 +168,15 @@ export class MobManager {
       speed,
       fuseTime,
       pointValue,
-      state: 'walking', // 'walking', 'igniting', 'shooting', 'dead'
+      state: 'walking',
       fuseTimer: 0,
-      shootTimer: 2.0 + Math.random() * 2.5,
+      shootTimer: 2.2 + Math.random() * 2.0,
       flashTimer: 0,
       deathTimer: 0,
-      wobblePhase: Math.random() * Math.PI * 2,
-      isBoss: type === 'wither'
+      wobblePhase: Math.random() * Math.PI * 2
     };
 
     this.activeMobs.push(mob);
-
-    if (mob.isBoss && this.onBossHealthChange) {
-      this.onBossHealthChange(mob.health, mob.maxHealth, true);
-    }
-
     return mob;
   }
 
@@ -203,10 +197,6 @@ export class MobManager {
     // Knockback
     mob.group.position.z -= 1.4;
 
-    if (mob.isBoss && this.onBossHealthChange) {
-      this.onBossHealthChange(Math.max(0, mob.health), mob.maxHealth, true);
-    }
-
     if (mob.health <= 0) {
       this.killMob(mob, isCritical);
     }
@@ -221,14 +211,10 @@ export class MobManager {
       this.sounds.stopCreeperHiss(mob.id);
     }
 
-    if (mob.isBoss && this.onBossHealthChange) {
-      this.onBossHealthChange(0, mob.maxHealth, false);
-    }
-
-    // Puff of smoke & death sounds
+    // Puff of smoke
     const centerPos = mob.group.position.clone();
     centerPos.y += 1.0;
-    this.world.spawnExplosion(centerPos, mob.isBoss ? 45 : 15);
+    this.world.spawnExplosion(centerPos, 18);
 
     if (this.onMobKilled) {
       this.onMobKilled(mob, isCritical);
@@ -249,7 +235,7 @@ export class MobManager {
     for (let i = this.activeMobs.length - 1; i >= 0; i--) {
       const mob = this.activeMobs[i];
 
-      // Handle Damage Flash
+      // Damage Flash Timer
       if (mob.flashTimer > 0) {
         mob.flashTimer -= delta;
         if (mob.flashTimer <= 0) {
@@ -262,10 +248,9 @@ export class MobManager {
         }
       }
 
-      // Handle Dead State
+      // Dead State Animation
       if (mob.state === 'dead') {
         mob.deathTimer += delta;
-        // Classic Minecraft tilt sideways
         mob.group.rotation.z = Math.min(Math.PI / 2, mob.deathTimer * 6);
         mob.group.position.y = Math.max(0, mob.group.position.y - delta * 2.0);
 
@@ -280,12 +265,16 @@ export class MobManager {
       mob.wobblePhase += delta * 6;
       const wobble = Math.sin(mob.wobblePhase) * 0.08;
 
+      // Always orient mob horizontally towards the player so it faces the camera directly!
+      const targetAngle = Math.atan2(playerPos.x - mob.group.position.x, playerPos.z - mob.group.position.z);
+      mob.group.rotation.y = targetAngle;
+
       // --- CREEPER BEHAVIOR ---
       if (mob.type === 'creeper') {
         const distZ = mob.group.position.z;
 
         if (distZ < -3.8) {
-          // Walk forward
+          // Walk forward towards player
           mob.group.position.z += mob.speed * delta;
           mob.group.rotation.z = wobble;
         } else {
@@ -320,7 +309,7 @@ export class MobManager {
             this.world.spawnExplosion(mob.group.position, 35);
 
             if (this.onPlayerDamage) {
-              this.onPlayerDamage(6, 'creeper'); // 3 hearts
+              this.onPlayerDamage(6, 'creeper');
             }
 
             this.scene.remove(mob.group);
@@ -335,7 +324,6 @@ export class MobManager {
         const distZ = mob.group.position.z;
 
         if (distZ < -11.0) {
-          // Walk forward
           mob.group.position.z += mob.speed * delta;
           mob.group.rotation.z = wobble;
         } else {
@@ -347,41 +335,16 @@ export class MobManager {
             mob.shootTimer = 2.4 + Math.random() * 1.2;
             this.sounds.playSkeletonShot();
 
-            // Spawn arrow towards player
             const arrowOrigin = mob.group.position.clone();
             arrowOrigin.y += 1.4;
             const targetPos = new THREE.Vector3(playerPos.x, 0.4, 0);
 
             this.world.spawnArrow(arrowOrigin, targetPos, () => {
               if (this.onPlayerDamage) {
-                this.onPlayerDamage(3, 'skeleton'); // 1.5 hearts
+                this.onPlayerDamage(3, 'skeleton');
               }
             });
           }
-        }
-      }
-
-      // --- WITHER BOSS BEHAVIOR ---
-      else if (mob.type === 'wither') {
-        // Menacing hover & sinusoidal sway
-        mob.group.position.z = Math.min(-12, mob.group.position.z + mob.speed * delta);
-        mob.group.position.x = Math.sin(Date.now() * 0.0015) * 4.5;
-        mob.group.position.y = 3.6 + Math.cos(Date.now() * 0.0025) * 0.8;
-
-        mob.shootTimer -= delta;
-        if (mob.shootTimer <= 0) {
-          mob.shootTimer = 2.0 + Math.random() * 1.5;
-          this.sounds.playWitherRoar();
-
-          const skullOrigin = mob.group.position.clone();
-          skullOrigin.y -= 0.5;
-          const targetPos = new THREE.Vector3(playerPos.x, 0.2, 0);
-
-          this.world.spawnArrow(skullOrigin, targetPos, () => {
-            if (this.onPlayerDamage) {
-              this.onPlayerDamage(5, 'wither'); // 2.5 hearts
-            }
-          });
         }
       }
     }

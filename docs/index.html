@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0f1118" />
-  <meta name="description" content="Minecraft Mob Defense 3D: Defiende la aldea contra Creepers, Esqueletos y el Wither con tu Espada de Diamante." />
+  <meta name="description" content="Minecraft Mob Defense 3D: Defiende la aldea contra Creepers y Esqueletos con tu Espada de Diamante en primera persona." />
   <title>Minecraft Mob Defense 3D — Defiende la Aldea</title>
   <link rel="stylesheet" href="css/styles.css" />
   <script type="importmap">
@@ -18,55 +18,51 @@
 </head>
 <body>
 
+  <!-- ACCESSIBILITY LIVE ANNOUNCER (SCREEN READERS) -->
+  <div id="a11y-announcements" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
   <!-- 3D WEBGL CONTAINER -->
-  <div id="game-container">
-    <canvas id="game-canvas"></canvas>
-  </div>
+  <main id="game-container" role="region" aria-label="Zona de defensa 3D en primera persona">
+    <canvas id="game-canvas" tabindex="0" role="img" aria-label="Campo de batalla 3D. Haz clic para capturar el ratón y mover la vista 360 grados. Presiona Espacio o Clic para atacar con la espada."></canvas>
+  </main>
 
   <!-- HURT RED VIGNETTE FLASH -->
-  <div id="hurt-vignette"></div>
-
-  <!-- WITHER BOSS HEALTH BAR -->
-  <div id="boss-bar-container">
-    <span class="boss-title">⚔️ EL WITHER (JEFE DEL NETHER) ⚔️</span>
-    <div class="boss-bar-frame">
-      <div class="boss-bar-fill" id="boss-bar-fill"></div>
-    </div>
-  </div>
+  <div id="hurt-vignette" aria-hidden="true"></div>
 
   <!-- TOP STATS HUD -->
-  <header id="top-hud">
+  <header id="top-hud" role="toolbar" aria-label="Panel de estadísticas de la partida">
     <div class="hud-group">
-      <div class="mc-panel">
+      <div class="mc-panel" aria-label="Oleada actual">
         <span class="hud-label">OLEADA</span>
-        <span class="hud-val cyan" id="wave-val">1 / 4</span>
+        <span class="hud-val cyan" id="wave-val" aria-live="polite">1 / 4</span>
       </div>
-      <div class="mc-panel">
+      <div class="mc-panel" aria-label="Puntaje acumulado">
         <span class="hud-label">PUNTAJE</span>
-        <span class="hud-val" id="score-val">0</span>
+        <span class="hud-val" id="score-val" aria-live="polite">0</span>
       </div>
-      <div class="mc-panel">
+      <div class="mc-panel" aria-label="Mobs derrotados">
         <span class="hud-label">MOBS ELIMINADOS</span>
-        <span class="hud-val green" id="kills-val">0</span>
+        <span class="hud-val green" id="kills-val" aria-live="polite">0</span>
       </div>
-      <div class="mc-panel">
+      <div class="mc-panel" aria-label="Multiplicador de combo">
         <span class="hud-label">COMBO</span>
-        <span class="hud-val" id="combo-val">x1</span>
+        <span class="hud-val" id="combo-val" aria-live="polite">x1</span>
       </div>
-      <div class="mc-panel">
+      <div class="mc-panel" aria-label="Precisión de golpes">
         <span class="hud-label">PRECISIÓN</span>
-        <span class="hud-val" id="accuracy-val">100%</span>
+        <span class="hud-val" id="accuracy-val" aria-live="polite">100%</span>
       </div>
     </div>
 
     <div class="icon-btn-group">
-      <button class="mc-btn-small" id="music-btn" title="Activar/Desactivar Música">🎵 ON</button>
-      <button class="mc-btn-small" id="mute-btn" title="Silenciar Sonido">🔊</button>
+      <button class="mc-btn-small" id="pause-btn" title="Pausar Partida (ESC)" aria-label="Pausar partida">⏸</button>
+      <button class="mc-btn-small" id="music-btn" title="Música ambiental (N)" aria-label="Alternar música">🎵 ON</button>
+      <button class="mc-btn-small" id="mute-btn" title="Silenciar sonido (M)" aria-label="Alternar efectos de sonido">🔊</button>
     </div>
   </header>
 
   <!-- CROSSHAIR & ATTACK RECHARGE -->
-  <div id="crosshair-container">
+  <div id="crosshair-container" aria-hidden="true">
     <div id="crosshair"></div>
     <div id="attack-indicator">
       <div id="attack-indicator-fill"></div>
@@ -74,16 +70,16 @@
   </div>
 
   <!-- FLOATING COMBAT TEXT LAYER -->
-  <div id="combat-feedback-layer"></div>
+  <div id="combat-feedback-layer" aria-hidden="true"></div>
 
   <!-- BOTTOM MINECRAFT HUD -->
-  <footer id="bottom-hud">
+  <footer id="bottom-hud" role="region" aria-label="Estado del jugador y barra de vida">
     <div class="status-bars">
       <!-- 10 MINECRAFT HEARTS -->
-      <div class="hearts-container" id="hearts-container"></div>
-      
+      <div class="hearts-container" id="hearts-container" role="progressbar" aria-label="Vida del jugador (20 puntos de vida)" aria-valuemin="0" aria-valuemax="20" aria-valuenow="20"></div>
+
       <!-- ARMOR ICONS -->
-      <div class="armor-container">
+      <div class="armor-container" aria-hidden="true">
         <svg viewBox="0 0 16 16" width="18" height="18"><path fill="#555" d="M3,2 h10 v2 h-10 z M2,4 h12 v6 h-12 z M4,10 h8 v3 h-8 z M6,13 h4 v2 h-4 z"/><path fill="#8b8b8b" d="M4,3 h8 v2 h-8 z M3,5 h10 v4 h-10 z M5,9 h6 v3 h-6 z"/><path fill="#ffffff" d="M4,4 h2 v1 h-2 z M3,6 h2 v2 h-2 z"/></svg>
         <svg viewBox="0 0 16 16" width="18" height="18"><path fill="#555" d="M3,2 h10 v2 h-10 z M2,4 h12 v6 h-12 z M4,10 h8 v3 h-8 z M6,13 h4 v2 h-4 z"/><path fill="#8b8b8b" d="M4,3 h8 v2 h-8 z M3,5 h10 v4 h-10 z M5,9 h6 v3 h-6 z"/><path fill="#ffffff" d="M4,4 h2 v1 h-2 z M3,6 h2 v2 h-2 z"/></svg>
         <svg viewBox="0 0 16 16" width="18" height="18"><path fill="#555" d="M3,2 h10 v2 h-10 z M2,4 h12 v6 h-12 z M4,10 h8 v3 h-8 z M6,13 h4 v2 h-4 z"/><path fill="#8b8b8b" d="M4,3 h8 v2 h-8 z M3,5 h10 v4 h-10 z M5,9 h6 v3 h-6 z"/><path fill="#ffffff" d="M4,4 h2 v1 h-2 z M3,6 h2 v2 h-2 z"/></svg>
@@ -93,7 +89,7 @@
     </div>
 
     <!-- XP BAR -->
-    <div class="xp-wrapper">
+    <div class="xp-wrapper" aria-label="Nivel y experiencia">
       <span id="xp-level">Lv. 1</span>
       <div class="xp-bar-bg">
         <div id="xp-bar-fill"></div>
@@ -101,9 +97,8 @@
     </div>
 
     <!-- HOTBAR -->
-    <div class="mc-hotbar">
-      <!-- Slot 1: Diamond Sword (Selected) -->
-      <div class="hotbar-slot selected">
+    <div class="mc-hotbar" aria-label="Barra de objetos">
+      <div class="hotbar-slot selected" aria-label="Ranura 1: Espada de Diamante seleccionada">
         <svg viewBox="0 0 16 16">
           <path fill="#000" d="M12,1 h3 v3 h-3 z M11,4 h2 v2 h-2 z M9,6 h2 v2 h-2 z M7,8 h2 v2 h-2 z M5,10 h2 v2 h-2 z M2,12 h3 v3 h-3 z M1,14 h2 v2 h-2 z"/>
           <path fill="#4df2ff" d="M13,2 h1 v1 h-1 z M11,3 h2 v1 h-2 z M9,5 h2 v2 h-2 z M7,7 h2 v2 h-2 z M5,9 h2 v2 h-2 z"/>
@@ -111,94 +106,125 @@
           <path fill="#663300" d="M4,11 h2 v2 h-2 z M2,13 h2 v2 h-2 z"/>
         </svg>
       </div>
-      <div class="hotbar-slot"></div>
-      <div class="hotbar-slot"></div>
-      <div class="hotbar-slot"></div>
-      <div class="hotbar-slot"></div>
-      <div class="hotbar-slot"></div>
-      <div class="hotbar-slot"></div>
-      <div class="hotbar-slot"></div>
-      <div class="hotbar-slot"></div>
+      <div class="hotbar-slot" aria-hidden="true"></div>
+      <div class="hotbar-slot" aria-hidden="true"></div>
+      <div class="hotbar-slot" aria-hidden="true"></div>
+      <div class="hotbar-slot" aria-hidden="true"></div>
+      <div class="hotbar-slot" aria-hidden="true"></div>
+      <div class="hotbar-slot" aria-hidden="true"></div>
+      <div class="hotbar-slot" aria-hidden="true"></div>
+      <div class="hotbar-slot" aria-hidden="true"></div>
     </div>
   </footer>
 
   <!-- START / DIFFICULTY SELECTION MODAL -->
-  <div class="modal-overlay active" id="start-modal">
+  <div class="modal-overlay active" id="start-modal" role="dialog" aria-modal="true" aria-labelledby="start-title">
     <div class="mc-dialog">
-      <h1>MINECRAFT MOB DEFENSE</h1>
+      <h1 id="start-title">MINECRAFT MOB DEFENSE</h1>
       <p class="dialog-desc">
-        ¡Los mobs atacan la aldea! Empuña tu <strong>Espada de Diamante</strong> y elimínalos antes de que se acerquen.
+        ¡Los mobs marchan hacia la aldea! Mueve la vista con el ratón en <strong>360°</strong> y empuña tu <strong>Espada de Diamante</strong> para derrotarlos.
         <br/><br/>
-        Cuidado con los <strong>Creepers</strong>: cuando lleguen cerca empezarán a sisear (*"Tssss..."*) y explotarán si no los derrotas a tiempo.
+        ⚠️ Cuidado con los <strong>Creepers</strong>: vienen de frente y al acercarse empezarán a sisear (*"Tssss..."*) e hincharse. ¡Elimínalos antes de que exploten!
       </p>
 
-      <div class="difficulty-grid">
-        <div class="diff-card" data-diff="easy">
+      <div class="difficulty-grid" role="radiogroup" aria-label="Selecciona la dificultad">
+        <div class="diff-card" data-diff="easy" role="radio" aria-checked="false" tabindex="0">
           <span class="diff-title">FÁCIL</span>
           <span class="diff-stats">
             • 3 Oleadas<br/>
-            • Mobs lentos<br/>
+            • Mobs más lentos<br/>
             • Mecha Creeper 2.8s<br/>
-            • Espada poderosa
+            • Espada potenciada
           </span>
         </div>
 
-        <div class="diff-card selected" data-diff="medium">
+        <div class="diff-card selected" data-diff="medium" role="radio" aria-checked="true" tabindex="0">
           <span class="diff-title">MEDIO</span>
           <span class="diff-stats">
             • 4 Oleadas<br/>
             • Creepers + Esqueletos<br/>
             • Mecha Creeper 1.8s<br/>
-            • Dificultad estándar
+            • Desafío equilibrado
           </span>
         </div>
 
-        <div class="diff-card" data-diff="hard">
+        <div class="diff-card" data-diff="hard" role="radio" aria-checked="false" tabindex="0">
           <span class="diff-title">DIFÍCIL</span>
           <span class="diff-stats">
             • 5 Oleadas<br/>
-            • Mecha rápida 1.2s<br/>
-            • JEFE WITHER final<br/>
-            • Máximo desafío
+            • Mecha veloz 1.25s<br/>
+            • Esqueletos rápidos<br/>
+            • Horda intensa
           </span>
         </div>
+      </div>
+
+      <!-- CONTROLS & ACCESSIBILITY GUIDE -->
+      <div class="a11y-guide" aria-label="Guía de controles y accesibilidad">
+        <span>🎮 <strong>Ratón:</strong> Vista libre 360° · <strong>Clic / Espacio:</strong> Atacar con espada</span>
+        <span>⌨️ <strong>ESC:</strong> Pausar / Continuar · <strong>M:</strong> Silenciar · <strong>N:</strong> Música</span>
       </div>
 
       <button class="mc-btn-large" id="start-btn">⚔️ INICIAR DEFENSA</button>
     </div>
   </div>
 
-  <!-- GAME OVER MODAL -->
-  <div class="modal-overlay" id="gameover-modal">
+  <!-- PAUSE MODAL -->
+  <div class="modal-overlay" id="pause-modal" role="dialog" aria-modal="true" aria-labelledby="pause-title">
     <div class="mc-dialog">
-      <h1 class="danger">¡HAS MUERTO!</h1>
+      <h1 id="pause-title">⏸ PARTIDA EN PAUSA</h1>
+      <p class="dialog-desc">El juego se encuentra pausado. Tus progresos en esta oleada están seguros.</p>
+
+      <div class="menu-btn-group">
+        <button class="mc-btn-large" id="resume-btn">▶ CONTINUAR PARTIDA</button>
+        <button class="mc-btn-large" id="pause-restart-btn">↻ REINICIAR OLEADA</button>
+        <button class="mc-btn-large secondary" id="pause-menu-btn">🚪 MENÚ PRINCIPAL</button>
+      </div>
+
+      <div class="icon-btn-group pause-audio-controls">
+        <button class="mc-btn-small" id="pause-music-btn" title="Música On/Off" aria-label="Alternar música">🎵 ON</button>
+        <button class="mc-btn-small" id="pause-mute-btn" title="Sonido On/Off" aria-label="Alternar sonido">🔊</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME OVER MODAL -->
+  <div class="modal-overlay" id="gameover-modal" role="dialog" aria-modal="true" aria-labelledby="go-title">
+    <div class="mc-dialog">
+      <h1 class="danger" id="go-title">¡HAS MUERTO!</h1>
       <p class="dialog-desc">Los mobs han atravesado las defensas de la aldea.</p>
 
-      <div class="stats-summary">
+      <div class="stats-summary" role="region" aria-label="Estadísticas finales">
         <div><span>Puntaje final:</span><strong id="go-score">0</strong></div>
         <div><span>Oleada alcanzada:</span><strong id="go-wave">1</strong></div>
         <div><span>Mobs derrotados:</span><strong id="go-kills">0</strong></div>
         <div><span>Precisión:</span><strong id="go-accuracy">0%</strong></div>
       </div>
 
-      <button class="mc-btn-large" id="restart-btn">↻ REAPARECER (NUEVA PARTIDA)</button>
+      <div class="menu-btn-group">
+        <button class="mc-btn-large" id="restart-btn">↻ REAPARECER</button>
+        <button class="mc-btn-large secondary" id="go-menu-btn">🚪 MENÚ PRINCIPAL</button>
+      </div>
     </div>
   </div>
 
   <!-- VICTORY MODAL -->
-  <div class="modal-overlay" id="victory-modal">
+  <div class="modal-overlay" id="victory-modal" role="dialog" aria-modal="true" aria-labelledby="vic-title">
     <div class="mc-dialog">
-      <h1 class="victory">¡VICTORIA ÉPICA!</h1>
+      <h1 class="victory" id="vic-title">¡VICTORIA ÉPICA!</h1>
       <p class="dialog-desc">¡Has defendido la aldea y derrotado todas las amenazas!</p>
 
-      <div class="stats-summary">
+      <div class="stats-summary" role="region" aria-label="Estadísticas de victoria">
         <div><span>Rango:</span><strong id="vic-rank">Campeón</strong></div>
         <div><span>Puntaje total:</span><strong id="vic-score">0</strong></div>
         <div><span>Mobs eliminados:</span><strong id="vic-kills">0</strong></div>
         <div><span>Mayor Combo:</span><strong id="vic-combo">x1</strong></div>
       </div>
 
-      <button class="mc-btn-large" id="victory-btn">⭐ JUGAR OTRA VEZ</button>
+      <div class="menu-btn-group">
+        <button class="mc-btn-large" id="victory-btn">⭐ JUGAR OTRA VEZ</button>
+        <button class="mc-btn-large secondary" id="vic-menu-btn">🚪 MENÚ PRINCIPAL</button>
+      </div>
     </div>
   </div>
 

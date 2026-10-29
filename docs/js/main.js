@@ -6,6 +6,12 @@ import { MobManager } from './mobs.js';
 
 /**
  * Main Minecraft Mob Defense Controller
+ * Features:
+ * - Full 360-degree Pointer Lock FPS Controls
+ * - Pause / Resume / Main Menu System
+ * - Diamond Sword in Hand with Swing & Recharge
+ * - Creeper & Skeleton waves (facing player)
+ * - Complete Accessibility (A11y ARIA Live announcements, Keyboard navigation)
  */
 class MinecraftGame {
   constructor() {
@@ -23,24 +29,23 @@ class MinecraftGame {
     this.xpBarFill = document.getElementById('xp-bar-fill');
     this.attackIndicator = document.getElementById('attack-indicator');
     this.attackIndicatorFill = document.getElementById('attack-indicator-fill');
-    this.bossBarContainer = document.getElementById('boss-bar-container');
-    this.bossBarFill = document.getElementById('boss-bar-fill');
     this.combatFeedbackLayer = document.getElementById('combat-feedback-layer');
     this.hurtVignette = document.getElementById('hurt-vignette');
+    this.a11yAnnouncer = document.getElementById('a11y-announcements');
 
     // Modals
     this.startModal = document.getElementById('start-modal');
+    this.pauseModal = document.getElementById('pause-modal');
     this.gameOverModal = document.getElementById('gameover-modal');
     this.victoryModal = document.getElementById('victory-modal');
 
-    // Dificultades
+    // Dificultades (Solo Creeper y Skeleton)
     this.difficulties = {
       easy: {
         name: 'FÁCIL',
         waves: 3,
         mobSpeedMultiplier: 0.75,
         creeperFuse: 2.8,
-        bossHealthMultiplier: 0.65,
         damageTakenMultiplier: 0.7,
         spawnInterval: 3.2
       },
@@ -49,7 +54,6 @@ class MinecraftGame {
         waves: 4,
         mobSpeedMultiplier: 1.0,
         creeperFuse: 1.8,
-        bossHealthMultiplier: 1.0,
         damageTakenMultiplier: 1.0,
         spawnInterval: 2.4
       },
@@ -58,7 +62,6 @@ class MinecraftGame {
         waves: 5,
         mobSpeedMultiplier: 1.35,
         creeperFuse: 1.25,
-        bossHealthMultiplier: 1.35,
         damageTakenMultiplier: 1.4,
         spawnInterval: 1.7
       },
@@ -67,7 +70,6 @@ class MinecraftGame {
         waves: Infinity,
         mobSpeedMultiplier: 1.1,
         creeperFuse: 1.6,
-        bossHealthMultiplier: 1.1,
         damageTakenMultiplier: 1.1,
         spawnInterval: 2.0
       }
@@ -75,7 +77,7 @@ class MinecraftGame {
     this.activeDifficulty = this.difficulties.medium;
 
     // Player State
-    this.maxHealth = 20; // 10 hearts
+    this.maxHealth = 20; // 10 corazones
     this.health = 20;
     this.score = 0;
     this.kills = 0;
@@ -89,14 +91,15 @@ class MinecraftGame {
     this.xpForNextLevel = 400;
 
     // Game Loop State
-    this.state = 'menu'; // 'menu', 'playing', 'gameover', 'victory', 'paused'
+    this.state = 'menu'; // 'menu', 'playing', 'paused', 'gameover', 'victory'
     this.clock = new THREE.Clock();
     this.raycaster = new THREE.Raycaster();
-    this.mouse = new THREE.Vector2(0, 0);
 
-    // Camera rotation look bounds
-    this.targetCameraRot = new THREE.Euler(0, 0, 0, 'YXZ');
-    this.currentCameraRot = new THREE.Euler(0, 0, 0, 'YXZ');
+    // 360-degree Pointer Lock Camera look
+    this.isPointerLocked = false;
+    this.cameraYaw = 0;
+    this.cameraPitch = 0;
+    this.mouseSensitivity = 0.0022;
 
     // Wave spawning state
     this.waveMobsToSpawn = [];
@@ -116,6 +119,7 @@ class MinecraftGame {
     const aspect = window.innerWidth / window.innerHeight;
     this.camera = new THREE.PerspectiveCamera(65, aspect, 0.1, 1000);
     this.camera.position.set(0, 0.8, 0); // Player eye level
+    this.camera.rotation.order = 'YXZ';
     this.scene.add(this.camera);
 
     this.renderer = new THREE.WebGLRenderer({
@@ -144,6 +148,7 @@ class MinecraftGame {
       this.mobManager.onLoadedCallback = () => {
         startBtn.disabled = false;
         startBtn.textContent = '⚔️ INICIAR DEFENSA';
+        this.announceA11y('Recursos listos. Presiona Iniciar Defensa para comenzar.');
       };
     }
 
@@ -155,30 +160,36 @@ class MinecraftGame {
     this.mobManager.onMobKilled = (mob, isCritical) => {
       this.handleMobKilled(mob, isCritical);
     };
-
-    this.mobManager.onBossHealthChange = (health, maxHealth, isAlive) => {
-      if (!isAlive || health <= 0) {
-        this.bossBarContainer.classList.remove('visible');
-      } else {
-        this.bossBarContainer.classList.add('visible');
-        const pct = Math.max(0, Math.min(100, (health / maxHealth) * 100));
-        this.bossBarFill.style.width = `${pct}%`;
-      }
-    };
   }
 
   initEventListeners() {
-    // Mouse movement: camera look & weapon sway
-    window.addEventListener('mousemove', (e) => {
-      // Convert to normalized coordinates (-1 to 1)
-      this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-      this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    // --- POINTER LOCK SYSTEM (Inmersive 360 FPS look) ---
+    this.canvas.addEventListener('click', () => {
+      if (this.state === 'playing' && document.pointerLockElement !== this.canvas) {
+        this.requestPointerLock();
+      }
+    });
 
-      // Subtly pan camera towards mouse
-      const maxYaw = 0.35; // horizontal angle limit
-      const maxPitch = 0.22; // vertical angle limit
-      this.targetCameraRot.y = -this.mouse.x * maxYaw;
-      this.targetCameraRot.x = this.mouse.y * maxPitch;
+    document.addEventListener('pointerlockchange', () => {
+      this.isPointerLocked = (document.pointerLockElement === this.canvas);
+      if (!this.isPointerLocked && this.state === 'playing') {
+        // Automatically pause when user exits pointer lock (e.g. pressed ESC)
+        this.pauseGame();
+      }
+    });
+
+    // 360-degree mouse look
+    window.addEventListener('mousemove', (e) => {
+      if (!this.isPointerLocked || this.state !== 'playing') return;
+
+      this.cameraYaw -= e.movementX * this.mouseSensitivity;
+      this.cameraPitch -= e.movementY * this.mouseSensitivity;
+
+      // Clamp vertical pitch to ~75 degrees up/down
+      const maxPitch = Math.PI * 0.42;
+      this.cameraPitch = Math.max(-maxPitch, Math.min(maxPitch, this.cameraPitch));
+
+      this.camera.rotation.set(this.cameraPitch, this.cameraYaw, 0, 'YXZ');
 
       if (this.sword) {
         this.sword.onMouseMove(e.movementX, e.movementY);
@@ -187,18 +198,33 @@ class MinecraftGame {
 
     // Attack on Click
     window.addEventListener('mousedown', (e) => {
-      if (this.state !== 'playing') return;
-      if (e.button !== 0) return; // Left click only
-      sounds.init();
-      this.attack();
-    });
-
-    // Spacebar to attack as well
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'Space' && this.state === 'playing') {
-        e.preventDefault();
+      if (e.button !== 0) return; // Left click
+      if (this.state === 'playing') {
         sounds.init();
         this.attack();
+      }
+    });
+
+    // Keyboard Shortcuts
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        if (this.state === 'playing') {
+          e.preventDefault();
+          sounds.init();
+          this.attack();
+        }
+      } else if (e.code === 'Escape') {
+        e.preventDefault();
+        if (this.state === 'playing') {
+          this.pauseGame();
+        } else if (this.state === 'paused') {
+          this.resumeGame();
+        }
+      } else if (e.code === 'KeyM') {
+        const isMuted = sounds.toggleMute();
+        this.updateAudioButtons(isMuted);
+      } else if (e.code === 'KeyN') {
+        this.toggleMusic();
       }
     });
 
@@ -211,20 +237,48 @@ class MinecraftGame {
         const diffKey = card.dataset.diff;
         if (this.difficulties[diffKey]) {
           this.activeDifficulty = this.difficulties[diffKey];
+          this.announceA11y(`Dificultad seleccionada: ${this.activeDifficulty.name}`);
         }
       });
     });
 
-    // UI Buttons
+    // Start Button
     document.getElementById('start-btn').addEventListener('click', () => {
       sounds.init();
       sounds.playButtonClick();
       this.startGame();
     });
 
+    // Pause Menu Buttons
+    document.getElementById('pause-btn').addEventListener('click', () => {
+      sounds.playButtonClick();
+      this.pauseGame();
+    });
+
+    document.getElementById('resume-btn').addEventListener('click', () => {
+      sounds.playButtonClick();
+      this.resumeGame();
+    });
+
+    document.getElementById('pause-restart-btn').addEventListener('click', () => {
+      sounds.playButtonClick();
+      this.startGame();
+    });
+
+    document.getElementById('pause-menu-btn').addEventListener('click', () => {
+      sounds.playButtonClick();
+      this.returnToMainMenu();
+    });
+
+    // Game Over & Victory Buttons
     document.getElementById('restart-btn').addEventListener('click', () => {
       sounds.playButtonClick();
       this.startGame();
+    });
+
+    document.getElementById('go-menu-btn').addEventListener('click', () => {
+      sounds.playButtonClick();
+      this.returnToMainMenu();
     });
 
     document.getElementById('victory-btn').addEventListener('click', () => {
@@ -232,20 +286,68 @@ class MinecraftGame {
       this.startGame();
     });
 
-    document.getElementById('mute-btn').addEventListener('click', () => {
-      const isMuted = sounds.toggleMute();
-      document.getElementById('mute-btn').textContent = isMuted ? '🔇' : '🔊';
+    document.getElementById('vic-menu-btn').addEventListener('click', () => {
+      sounds.playButtonClick();
+      this.returnToMainMenu();
     });
 
-    document.getElementById('music-btn').addEventListener('click', () => {
-      if (sounds.isMusicPlaying) {
-        sounds.stopMusic();
-        document.getElementById('music-btn').textContent = '🎵 OFF';
-      } else {
-        sounds.startMusic();
-        document.getElementById('music-btn').textContent = '🎵 ON';
-      }
+    // Audio & Music Toggles
+    const muteBtns = [document.getElementById('mute-btn'), document.getElementById('pause-mute-btn')];
+    muteBtns.forEach((btn) => {
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        const isMuted = sounds.toggleMute();
+        this.updateAudioButtons(isMuted);
+      });
     });
+
+    const musicBtns = [document.getElementById('music-btn'), document.getElementById('pause-music-btn')];
+    musicBtns.forEach((btn) => {
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        this.toggleMusic();
+      });
+    });
+  }
+
+  requestPointerLock() {
+    try {
+      this.canvas.requestPointerLock();
+    } catch (_) {}
+  }
+
+  exitPointerLock() {
+    if (document.pointerLockElement) {
+      document.exitPointerLock();
+    }
+  }
+
+  updateAudioButtons(isMuted) {
+    const text = isMuted ? '🔇' : '🔊';
+    const m1 = document.getElementById('mute-btn');
+    const m2 = document.getElementById('pause-mute-btn');
+    if (m1) m1.textContent = text;
+    if (m2) m2.textContent = text;
+    this.announceA11y(isMuted ? 'Sonido silenciado' : 'Sonido activado');
+  }
+
+  toggleMusic() {
+    if (sounds.isMusicPlaying) {
+      sounds.stopMusic();
+      this.setMusicBtnText('🎵 OFF');
+      this.announceA11y('Música desactivada');
+    } else {
+      sounds.startMusic();
+      this.setMusicBtnText('🎵 ON');
+      this.announceA11y('Música activada');
+    }
+  }
+
+  setMusicBtnText(text) {
+    const b1 = document.getElementById('music-btn');
+    const b2 = document.getElementById('pause-music-btn');
+    if (b1) b1.textContent = text;
+    if (b2) b2.textContent = text;
   }
 
   onWindowResize() {
@@ -257,10 +359,7 @@ class MinecraftGame {
   }
 
   startGame() {
-    // Hide modals
-    this.startModal.classList.remove('active');
-    this.gameOverModal.classList.remove('active');
-    this.victoryModal.classList.remove('active');
+    this.hideAllModals();
 
     // Reset stats
     this.health = this.maxHealth;
@@ -275,12 +374,52 @@ class MinecraftGame {
     this.xpLevel = 1;
     this.xpForNextLevel = 400;
 
+    // Reset camera look
+    this.cameraYaw = 0;
+    this.cameraPitch = 0;
+    this.camera.rotation.set(0, 0, 0, 'YXZ');
+
     this.mobManager.clearAll();
     this.updateHUD();
     this.prepareWave(this.currentWave);
 
     this.state = 'playing';
+    this.requestPointerLock();
+
+    this.announceA11y(`Partida iniciada en dificultad ${this.activeDifficulty.name}. Oleada 1.`);
     this.showFloatingText(window.innerWidth / 2, window.innerHeight * 0.35, `¡OLEADA ${this.currentWave}!`, 'defuse');
+  }
+
+  pauseGame() {
+    if (this.state !== 'playing') return;
+    this.state = 'paused';
+    this.exitPointerLock();
+    this.pauseModal.classList.add('active');
+    this.announceA11y('Partida en pausa. Usa Continuar para volver.');
+  }
+
+  resumeGame() {
+    if (this.state !== 'paused') return;
+    this.pauseModal.classList.remove('active');
+    this.state = 'playing';
+    this.requestPointerLock();
+    this.announceA11y('Partida reanudada.');
+  }
+
+  returnToMainMenu() {
+    this.state = 'menu';
+    this.exitPointerLock();
+    this.mobManager.clearAll();
+    this.hideAllModals();
+    this.startModal.classList.add('active');
+    this.announceA11y('Menú principal.');
+  }
+
+  hideAllModals() {
+    this.startModal.classList.remove('active');
+    this.pauseModal.classList.remove('active');
+    this.gameOverModal.classList.remove('active');
+    this.victoryModal.classList.remove('active');
   }
 
   prepareWave(waveNum) {
@@ -288,22 +427,18 @@ class MinecraftGame {
     this.waveMobsToSpawn = [];
     this.spawnTimer = 0.5;
 
-    // Mob composition by wave & difficulty
     const countMultiplier = this.activeDifficulty.waves === Infinity ? (1 + waveNum * 0.25) : 1;
 
     if (waveNum === 1) {
-      // Wave 1: Mostly Creepers to learn timing
       for (let i = 0; i < Math.floor(4 * countMultiplier); i++) {
         this.waveMobsToSpawn.push('creeper');
       }
     } else if (waveNum === 2) {
-      // Wave 2: Creepers + Skeletons
       for (let i = 0; i < Math.floor(3 * countMultiplier); i++) {
         this.waveMobsToSpawn.push('creeper');
         this.waveMobsToSpawn.push('skeleton');
       }
     } else if (waveNum === 3) {
-      // Wave 3: Faster horde
       for (let i = 0; i < Math.floor(5 * countMultiplier); i++) {
         this.waveMobsToSpawn.push('creeper');
       }
@@ -311,19 +446,18 @@ class MinecraftGame {
         this.waveMobsToSpawn.push('skeleton');
       }
     } else if (waveNum === 4) {
-      // Wave 4: Intense rush
       for (let i = 0; i < Math.floor(6 * countMultiplier); i++) {
         this.waveMobsToSpawn.push('creeper');
       }
-      for (let i = 0; i < Math.floor(4 * countMultiplier); i++) {
+      for (let i = 0; i < Math.floor(5 * countMultiplier); i++) {
         this.waveMobsToSpawn.push('skeleton');
       }
     } else if (waveNum >= 5) {
-      // Final Wave: WITHER BOSS + Minions!
-      this.waveMobsToSpawn.push('wither');
-      for (let i = 0; i < 4; i++) {
-        this.waveMobsToSpawn.push('skeleton');
+      for (let i = 0; i < Math.floor(8 * countMultiplier); i++) {
         this.waveMobsToSpawn.push('creeper');
+      }
+      for (let i = 0; i < Math.floor(6 * countMultiplier); i++) {
+        this.waveMobsToSpawn.push('skeleton');
       }
     }
 
@@ -333,17 +467,13 @@ class MinecraftGame {
   attack() {
     this.shots++;
 
-    // Trigger sword animation & fetch charge
     const charge = this.sword.triggerAttack();
-
-    // Slash particle arc in front of camera
     this.world.spawnSlashArc(this.camera.position, this.camera.getWorldDirection(new THREE.Vector3()));
 
-    // Raycast from center crosshair
+    // Center raycast in first-person FPS view
     this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
     const hit = this.mobManager.raycast(this.raycaster);
 
-    // Screen coordinates of center
     const cx = window.innerWidth / 2;
     const cy = window.innerHeight / 2;
 
@@ -351,22 +481,17 @@ class MinecraftGame {
       const mob = hit.mob;
       const dist = hit.distance;
 
-      // Sword reach limit (~15 units)
       if (dist <= 15.5) {
         this.hits++;
         this.combo++;
         if (this.combo > this.maxCombo) this.maxCombo = this.combo;
 
-        // Critical hit check: fully charged strike (>= 0.88 charge)
         const isCritical = charge >= 0.88;
-
-        // Base damage: 14 HP. Critical: 28 HP
         let damage = Math.round((isCritical ? 26 : 14) * Math.max(0.3, charge));
         if (this.activeDifficulty === this.difficulties.easy) {
-          damage = Math.round(damage * 1.5); // Boosted on easy
+          damage = Math.round(damage * 1.5);
         }
 
-        // Apply mob damage
         this.mobManager.takeDamage(mob, damage, isCritical);
 
         if (isCritical) {
@@ -379,14 +504,11 @@ class MinecraftGame {
           this.showFloatingText(cx + (Math.random() - 0.5) * 30, cy - 20, `-${damage}`, 'hit');
         }
 
-        // Screen micro shake on impact
         this.shakeScreen();
       } else {
-        // Out of reach
         this.showFloatingText(cx, cy + 30, '¡DEMASIADO LEJOS!', 'hurt');
       }
     } else {
-      // Missed
       if (this.combo > 1) {
         this.combo = 0;
       }
@@ -398,7 +520,6 @@ class MinecraftGame {
   handleMobKilled(mob, isCritical) {
     this.kills++;
 
-    // Calculate score & XP
     let points = mob.pointValue;
     if (isCritical) points = Math.round(points * 1.5);
     if (this.combo > 1) points = Math.round(points * (1 + this.combo * 0.15));
@@ -406,12 +527,12 @@ class MinecraftGame {
     this.score += points;
     this.addXP(Math.round(points * 0.8));
 
-    // Special banner for defusing Creeper
     if (mob.type === 'creeper') {
       this.showFloatingText(window.innerWidth / 2, window.innerHeight * 0.45, '¡CREEPER ELIMINADO! +XP', 'defuse');
-    } else if (mob.type === 'wither') {
-      this.showFloatingText(window.innerWidth / 2, window.innerHeight * 0.35, '¡WITHER DERROTADO! +1500', 'crit');
-      sounds.playLevelUp();
+      this.announceA11y('Creeper eliminado');
+    } else {
+      this.showFloatingText(window.innerWidth / 2, window.innerHeight * 0.45, '¡ESQUELETO DERROTADO!', 'defuse');
+      this.announceA11y('Esqueleto eliminado');
     }
 
     this.updateHUD();
@@ -425,8 +546,8 @@ class MinecraftGame {
       this.xpForNextLevel = Math.round(this.xpForNextLevel * 1.35);
       sounds.playLevelUp();
       this.showFloatingText(window.innerWidth / 2, window.innerHeight * 0.25, `¡NIVEL ${this.xpLevel}!`, 'defuse');
+      this.announceA11y(`¡Subiste al nivel ${this.xpLevel}! Vida regenerada.`);
 
-      // Heal 2 hearts on level up!
       this.health = Math.min(this.maxHealth, this.health + 4);
       this.renderHearts();
     }
@@ -441,18 +562,18 @@ class MinecraftGame {
 
     const scaledDamage = Math.round(amount * (this.activeDifficulty.damageTakenMultiplier || 1.0));
     this.health = Math.max(0, this.health - scaledDamage);
-    this.combo = 0; // Break combo
+    this.combo = 0;
 
     sounds.playPlayerHurt();
 
-    // Trigger red hurt vignette
     this.hurtVignette.classList.add('active');
     setTimeout(() => this.hurtVignette.classList.remove('active'), 250);
 
-    // Screen shake
     this.shakeScreen(true);
     this.renderHearts();
     this.updateHUD();
+
+    this.announceA11y(`¡Daño recibido! Te quedan ${Math.ceil(this.health / 2)} corazones.`);
 
     if (this.health <= 0) {
       this.gameOver();
@@ -461,7 +582,7 @@ class MinecraftGame {
 
   shakeScreen(hard = false) {
     this.canvas.classList.remove('shake-screen');
-    void this.canvas.offsetWidth; // Trigger reflow
+    void this.canvas.offsetWidth;
     this.canvas.classList.add('shake-screen');
   }
 
@@ -478,26 +599,30 @@ class MinecraftGame {
     }, 850);
   }
 
+  announceA11y(message) {
+    if (this.a11yAnnouncer) {
+      this.a11yAnnouncer.textContent = message;
+    }
+  }
+
   renderHearts() {
     this.heartsContainer.innerHTML = '';
     const totalHearts = 10;
-    const currentHalfHearts = this.health; // 20 max
+    const currentHalfHearts = this.health;
 
     for (let i = 0; i < totalHearts; i++) {
       const heartVal = currentHalfHearts - i * 2;
       const heartSvg = document.createElement('div');
       heartSvg.className = 'mc-heart';
       if (heartVal <= 0) {
-        // Empty Heart
         heartSvg.innerHTML = `
-          <svg viewBox="0 0 16 16" width="18" height="18">
+          <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
             <path fill="#222" d="M2,2 h4 v2 h-4 z M10,2 h4 v2 h-4 z M1,4 h6 v2 h-6 z M9,4 h6 v2 h-6 z M1,6 h14 v4 h-14 z M3,10 h10 v2 h-10 z M5,12 h6 v2 h-6 z M7,14 h2 v2 h-2 z"/>
             <path fill="#555" d="M3,3 h2 v2 h-2 z M11,3 h2 v2 h-2 z M2,5 h12 v4 h-12 z M4,9 h8 v2 h-8 z M6,11 h4 v2 h-4 z"/>
           </svg>`;
       } else if (heartVal === 1) {
-        // Half Heart
         heartSvg.innerHTML = `
-          <svg viewBox="0 0 16 16" width="18" height="18">
+          <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
             <path fill="#222" d="M2,2 h4 v2 h-4 z M10,2 h4 v2 h-4 z M1,4 h6 v2 h-6 z M9,4 h6 v2 h-6 z M1,6 h14 v4 h-14 z M3,10 h10 v2 h-10 z M5,12 h6 v2 h-6 z M7,14 h2 v2 h-2 z"/>
             <path fill="#555" d="M11,3 h2 v2 h-2 z M8,5 h6 v4 h-6 z M8,9 h4 v2 h-4 z M8,11 h2 v2 h-2 z"/>
             <path fill="#e01010" d="M3,3 h2 v2 h-2 z M2,5 h6 v4 h-6 z M4,9 h4 v2 h-4 z M6,11 h2 v2 h-2 z"/>
@@ -505,9 +630,8 @@ class MinecraftGame {
           </svg>`;
         heartSvg.classList.add('shake');
       } else {
-        // Full Heart
         heartSvg.innerHTML = `
-          <svg viewBox="0 0 16 16" width="18" height="18">
+          <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
             <path fill="#222" d="M2,2 h4 v2 h-4 z M10,2 h4 v2 h-4 z M1,4 h6 v2 h-6 z M9,4 h6 v2 h-6 z M1,6 h14 v4 h-14 z M3,10 h10 v2 h-10 z M5,12 h6 v2 h-6 z M7,14 h2 v2 h-2 z"/>
             <path fill="#e01010" d="M3,3 h2 v2 h-2 z M11,3 h2 v2 h-2 z M2,5 h12 v4 h-12 z M4,9 h8 v2 h-8 z M6,11 h4 v2 h-4 z M7,13 h2 v1 h-2 z"/>
             <path fill="#ff6666" d="M3,3 h1 v1 h-1 z M11,3 h1 v1 h-1 z M2,5 h2 v1 h-2 z M10,5 h2 v1 h-2 z"/>
@@ -524,7 +648,6 @@ class MinecraftGame {
       : `${this.currentWave} / ${this.activeDifficulty.waves}`;
     this.killsEl.textContent = this.kills;
 
-    // Combo
     if (this.combo > 1) {
       this.comboEl.textContent = `x${this.combo} COMBO!`;
       this.comboEl.className = 'hud-val hud-combo';
@@ -533,34 +656,34 @@ class MinecraftGame {
       this.comboEl.className = 'hud-val';
     }
 
-    // Accuracy
     const acc = this.shots > 0 ? Math.round((this.hits / this.shots) * 100) : 100;
     this.accuracyEl.textContent = `${acc}%`;
   }
 
   gameOver() {
     this.state = 'gameover';
+    this.exitPointerLock();
     this.mobManager.clearAll();
 
-    // Populate game over stats
     document.getElementById('go-score').textContent = this.score;
     document.getElementById('go-wave').textContent = this.currentWave;
     document.getElementById('go-kills').textContent = this.kills;
     document.getElementById('go-accuracy').textContent = `${this.shots > 0 ? Math.round((this.hits / this.shots) * 100) : 100}%`;
 
     this.gameOverModal.classList.add('active');
+    this.announceA11y(`¡Has muerto! Puntaje final: ${this.score}. Mobs derrotados: ${this.kills}.`);
   }
 
   victory() {
     this.state = 'victory';
+    this.exitPointerLock();
     this.mobManager.clearAll();
     sounds.playLevelUp();
 
-    // Rank evaluation
     let rank = 'Guerrero de Madera';
-    if (this.score >= 5000) rank = 'Leyenda de Netherite ⚔️';
-    else if (this.score >= 3000) rank = 'Campeón de Diamante 💎';
-    else if (this.score >= 1500) rank = 'Defensor de Hierro 🛡️';
+    if (this.score >= 4500) rank = 'Leyenda de Netherite ⚔️';
+    else if (this.score >= 2500) rank = 'Campeón de Diamante 💎';
+    else if (this.score >= 1200) rank = 'Defensor de Hierro 🛡️';
 
     document.getElementById('vic-rank').textContent = rank;
     document.getElementById('vic-score').textContent = this.score;
@@ -568,50 +691,40 @@ class MinecraftGame {
     document.getElementById('vic-combo').textContent = `x${this.maxCombo}`;
 
     this.victoryModal.classList.add('active');
+    this.announceA11y(`¡Victoria épica! Aldea defendida. Rango obtenido: ${rank}. Puntaje: ${this.score}.`);
   }
 
   update(delta) {
-    // Camera smooth look rotation interpolation
-    this.currentCameraRot.y = THREE.MathUtils.lerp(this.currentCameraRot.y, this.targetCameraRot.y, 0.12);
-    this.currentCameraRot.x = THREE.MathUtils.lerp(this.currentCameraRot.x, this.targetCameraRot.x, 0.12);
-    this.camera.rotation.copy(this.currentCameraRot);
-
-    // Update World (clouds, particles, torches, arrows)
     this.world.update(delta);
 
-    // Update Diamond Sword
     if (this.sword) {
       this.sword.update(delta);
-      // Update attack charge indicator
       const pct = Math.min(100, Math.round(this.sword.charge * 100));
       this.attackIndicatorFill.style.width = `${pct}%`;
       this.attackIndicator.classList.toggle('charged', this.sword.charge >= 0.95);
     }
 
     if (this.state === 'playing') {
-      // Spawn wave mobs
       if (this.waveMobsToSpawn.length > 0) {
         this.spawnTimer -= delta;
         if (this.spawnTimer <= 0) {
           this.spawnTimer = this.activeDifficulty.spawnInterval;
           const nextType = this.waveMobsToSpawn.shift();
-          // Varied X positions (-6 to 6) and far depth Z (-32 to -22)
           const spawnX = (Math.random() - 0.5) * 11;
           const spawnZ = -26 - Math.random() * 8;
           this.mobManager.spawnMob(nextType, spawnX, spawnZ, this.activeDifficulty);
         }
       }
 
-      // Update active mobs
       this.mobManager.update(delta, this.camera.position);
 
-      // Check wave completion
       if (this.waveMobsToSpawn.length === 0 && this.mobManager.activeMobs.length === 0) {
         if (!this.isWaveTransitioning) {
           this.isWaveTransitioning = true;
           this.waveTransitionTimer = 2.2;
           sounds.playLevelUp();
           this.showFloatingText(window.innerWidth / 2, window.innerHeight * 0.35, '¡OLEADA COMPLETADA!', 'defuse');
+          this.announceA11y(`¡Oleada ${this.currentWave} completada!`);
         } else {
           this.waveTransitionTimer -= delta;
           if (this.waveTransitionTimer <= 0) {
@@ -621,6 +734,7 @@ class MinecraftGame {
               this.currentWave++;
               this.prepareWave(this.currentWave);
               this.showFloatingText(window.innerWidth / 2, window.innerHeight * 0.35, `¡OLEADA ${this.currentWave}!`, 'defuse');
+              this.announceA11y(`Comienza la Oleada ${this.currentWave}`);
             }
           }
         }
@@ -640,7 +754,7 @@ class MinecraftGame {
   }
 }
 
-// Instantiate and start
+// Start
 window.addEventListener('DOMContentLoaded', () => {
   const game = new MinecraftGame();
   game.startLoop();
