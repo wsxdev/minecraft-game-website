@@ -1,43 +1,9 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-// Helper for pixel-perfect Minecraft block UV mapping on standard skins
-function createMinecraftBox(w, h, d, u, v, pw, ph, pd, texW, texH, mat) {
-  const geo = new THREE.BoxGeometry(w, h, d);
-  const uvAttr = geo.attributes.uv;
-
-  // Face 0: +X (Right side of mob)
-  setFaceUV(uvAttr, 0, u, v + pd, pd, ph, texW, texH);
-  // Face 1: -X (Left side of mob)
-  setFaceUV(uvAttr, 1, u + pd + pw, v + pd, pd, ph, texW, texH);
-  // Face 2: +Y (Top)
-  setFaceUV(uvAttr, 2, u + pd, v, pw, pd, texW, texH);
-  // Face 3: -Y (Bottom)
-  setFaceUV(uvAttr, 3, u + pd + pw, v, pw, pd, texW, texH);
-  // Face 4: +Z (Front face)
-  setFaceUV(uvAttr, 4, u + pd, v + pd, pw, ph, texW, texH);
-  // Face 5: -Z (Back)
-  setFaceUV(uvAttr, 5, u + pd + pw + pd, v + pd, pw, ph, texW, texH);
-
-  geo.uvsNeedUpdate = true;
-  return new THREE.Mesh(geo, mat);
-}
-
-function setFaceUV(uvAttr, faceIndex, x, y, w, h, texW, texH) {
-  const u0 = x / texW;
-  const u1 = (x + w) / texW;
-  const v0 = 1 - (y + h) / texH;
-  const v1 = 1 - y / texH;
-  const offset = faceIndex * 4;
-  uvAttr.setXY(offset + 0, u0, v1);
-  uvAttr.setXY(offset + 1, u1, v1);
-  uvAttr.setXY(offset + 2, u0, v0);
-  uvAttr.setXY(offset + 3, u1, v0);
-}
-
 /**
  * Mob Manager for Creeper, Skeleton, and Wither
- * Builds clean, authentic Minecraft models with zero vertex-stretching artifacts or walls.
+ * Loads and manages 3D GLTF models from docs/models/ with authentic Minecraft behaviors.
  */
 export class MobManager {
   constructor(scene, world, sounds) {
@@ -61,202 +27,73 @@ export class MobManager {
   }
 
   async preloadTemplates() {
-    try {
-      // 1. Creeper GLTF model
-      const creeperGltf = await this.loader.loadAsync('models/creeper/scene.gltf');
-      const creeperModel = creeperGltf.scene;
+    const list = [
+      { name: 'creeper', path: 'models/creeper/scene.gltf', targetHeight: 1.95, rotateY: Math.PI },
+      { name: 'skeleton', path: 'models/skeleton/scene.gltf', targetHeight: 2.1, rotateY: 0 },
+      { name: 'wither', path: 'models/wither/scene.gltf', targetHeight: 2.7, rotateY: 0 }
+    ];
 
-      const box = new THREE.Box3().setFromObject(creeperModel);
-      const size = new THREE.Vector3();
-      box.getSize(size);
-      const center = new THREE.Vector3();
-      box.getCenter(center);
+    let loadedCount = 0;
+    for (const item of list) {
+      try {
+        const gltf = await this.loader.loadAsync(item.path);
+        const model = gltf.scene;
 
-      const targetHeight = 1.95;
-      const scale = targetHeight / (size.y || 1);
-      creeperModel.scale.setScalar(scale);
+        const box = new THREE.Box3().setFromObject(model);
+        const size = new THREE.Vector3();
+        box.getSize(size);
+        const center = new THREE.Vector3();
+        box.getCenter(center);
 
-      creeperModel.position.x = -center.x * scale;
-      creeperModel.position.y = -box.min.y * scale;
-      creeperModel.position.z = -center.z * scale;
-      creeperModel.rotation.y = Math.PI; // Face the player directly
+        const scale = item.targetHeight / (size.y || 1);
+        model.scale.setScalar(scale);
 
-      creeperModel.traverse((child) => {
-        if (child.isMesh) {
-          child.castShadow = true;
-          child.receiveShadow = true;
-          child.frustumCulled = false;
-          if (child.material) {
-            child.material = child.material.clone();
-            if (child.material.map) {
-              child.material.map.magFilter = THREE.NearestFilter;
+        // Center bottom at Y = 0
+        model.position.x = -center.x * scale;
+        model.position.y = -box.min.y * scale;
+        model.position.z = -center.z * scale;
+
+        if (item.rotateY) {
+          model.rotation.y = item.rotateY;
+        }
+
+        model.traverse((child) => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+            child.frustumCulled = false;
+            if (child.material) {
+              child.material = child.material.clone();
+              if (child.material.map) {
+                child.material.map.magFilter = THREE.NearestFilter;
+                child.material.map.minFilter = THREE.NearestFilter;
+              }
             }
           }
-        }
-      });
+        });
 
-      const creeperRoot = new THREE.Group();
-      creeperRoot.add(creeperModel);
-      this.templates['creeper'] = {
-        root: creeperRoot,
-        targetHeight,
-        radius: (size.x * scale) * 0.5
-      };
-    } catch (err) {
-      console.error('Error loading creeper GLTF:', err);
-      this.templates['creeper'] = this.createFallbackTemplate('creeper', 1.95);
+        const root = new THREE.Group();
+        root.add(model);
+
+        this.templates[item.name] = {
+          root,
+          targetHeight: item.targetHeight,
+          radius: (size.x * scale) * 0.5
+        };
+        loadedCount++;
+      } catch (err) {
+        console.error(`Error loading GLTF model ${item.name}:`, err);
+        this.templates[item.name] = this.createFallbackTemplate(item.name, item.targetHeight);
+        loadedCount++;
+      }
     }
 
-    try {
-      // 2. Authentic Minecraft Skeleton with authentic texture (Zero wall/skinnedmesh bugs!)
-      this.templates['skeleton'] = await this.createSkeletonTemplate();
-    } catch (err) {
-      console.error('Error creating skeleton template:', err);
-      this.templates['skeleton'] = this.createFallbackTemplate('skeleton', 2.1);
+    if (loadedCount === list.length) {
+      this.isLoaded = true;
+      if (this.onLoadedCallback) {
+        this.onLoadedCallback();
+      }
     }
-
-    try {
-      // 3. Authentic Minecraft Wither Boss
-      this.templates['wither'] = await this.createWitherTemplate();
-    } catch (err) {
-      console.error('Error creating wither template:', err);
-      this.templates['wither'] = this.createFallbackTemplate('wither', 2.7);
-    }
-
-    this.isLoaded = true;
-    if (this.onLoadedCallback) {
-      this.onLoadedCallback();
-    }
-  }
-
-  async createSkeletonTemplate() {
-    const texLoader = new THREE.TextureLoader();
-    let mat;
-    try {
-      const tex = await texLoader.loadAsync('models/skeleton/textures/Material_baseColor.png');
-      tex.magFilter = THREE.NearestFilter;
-      tex.minFilter = THREE.NearestFilter;
-      tex.colorSpace = THREE.SRGBColorSpace;
-      mat = new THREE.MeshLambertMaterial({ map: tex });
-    } catch (_) {
-      mat = new THREE.MeshLambertMaterial({ color: 0xd0d0d0 });
-    }
-
-    const root = new THREE.Group();
-
-    // Standard Minecraft Skeleton proportions (total height = 2.1)
-    // Head: 8x8x8 px -> 0.5x0.5x0.5
-    const head = createMinecraftBox(0.5, 0.5, 0.5, 0, 0, 8, 8, 8, 64, 32, mat);
-    head.position.set(0, 1.77, 0);
-    root.add(head);
-
-    // Body: 8x12x4 px -> 0.5x0.76x0.25
-    const body = createMinecraftBox(0.5, 0.76, 0.25, 16, 16, 8, 12, 4, 64, 32, mat);
-    body.position.set(0, 1.14, 0);
-    root.add(body);
-
-    // Right Arm: 2x12x2 px -> 0.14x0.76x0.14
-    const rArm = createMinecraftBox(0.14, 0.76, 0.14, 40, 16, 2, 12, 2, 64, 32, mat);
-    rArm.position.set(-0.32, 1.25, 0.22);
-    rArm.rotation.x = -Math.PI * 0.45; // aiming bow forward towards player
-    rArm.rotation.z = -0.1;
-    root.add(rArm);
-
-    // Left Arm: 2x12x2 px -> 0.14x0.76x0.14
-    const lArm = createMinecraftBox(0.14, 0.76, 0.14, 40, 16, 2, 12, 2, 64, 32, mat);
-    lArm.position.set(0.32, 1.25, 0.22);
-    lArm.rotation.x = -Math.PI * 0.45; // aiming bow forward towards player
-    lArm.rotation.z = 0.1;
-    root.add(lArm);
-
-    // Right Leg: 2x12x2 px -> 0.14x0.76x0.14
-    const rLeg = createMinecraftBox(0.14, 0.76, 0.14, 0, 16, 2, 12, 2, 64, 32, mat);
-    rLeg.position.set(-0.13, 0.38, 0);
-    root.add(rLeg);
-
-    // Left Leg: 2x12x2 px -> 0.14x0.76x0.14
-    const lLeg = createMinecraftBox(0.14, 0.76, 0.14, 0, 16, 2, 12, 2, 64, 32, mat);
-    lLeg.position.set(0.13, 0.38, 0);
-    root.add(lLeg);
-
-    // Minecraft Bow held in hands
-    const bowMat = new THREE.MeshLambertMaterial({ color: 0x5a3d20 });
-    const bowMesh = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.62, 0.06), bowMat);
-    bowMesh.position.set(0, 1.25, 0.52);
-    bowMesh.rotation.z = -0.15;
-    root.add(bowMesh);
-
-    return {
-      root,
-      targetHeight: 2.1,
-      radius: 0.45
-    };
-  }
-
-  async createWitherTemplate() {
-    const texLoader = new THREE.TextureLoader();
-    let mat;
-    try {
-      const tex = await texLoader.loadAsync('models/wither/textures/M_Wither_baseColor.png');
-      tex.magFilter = THREE.NearestFilter;
-      tex.minFilter = THREE.NearestFilter;
-      tex.colorSpace = THREE.SRGBColorSpace;
-      mat = new THREE.MeshLambertMaterial({ map: tex });
-    } catch (_) {
-      mat = new THREE.MeshLambertMaterial({ color: 0x222222 });
-    }
-
-    const root = new THREE.Group();
-
-    // Central Main Head (8x8x8)
-    const mainHead = createMinecraftBox(0.65, 0.65, 0.65, 0, 0, 8, 8, 8, 64, 64, mat);
-    mainHead.position.set(0, 2.45, 0.05);
-    root.add(mainHead);
-
-    // Left Head (6x6x6)
-    const leftHead = createMinecraftBox(0.50, 0.50, 0.50, 32, 0, 6, 6, 6, 64, 64, mat);
-    leftHead.position.set(-0.85, 2.25, 0);
-    root.add(leftHead);
-
-    // Right Head (6x6x6)
-    const rightHead = createMinecraftBox(0.50, 0.50, 0.50, 32, 0, 6, 6, 6, 64, 64, mat);
-    rightHead.position.set(0.85, 2.25, 0);
-    root.add(rightHead);
-
-    // Shoulder Horizontal Bar (20x3x3)
-    const bar = createMinecraftBox(2.0, 0.28, 0.28, 0, 16, 20, 3, 3, 64, 64, mat);
-    bar.position.set(0, 1.9, 0);
-    root.add(bar);
-
-    // Vertical Spine (3x10x3)
-    const spine = createMinecraftBox(0.28, 1.0, 0.28, 0, 22, 3, 10, 3, 64, 64, mat);
-    spine.position.set(0, 1.35, 0);
-    root.add(spine);
-
-    // 3 Ribs across spine (8x2x2)
-    const ribMat = mat;
-    const r1 = createMinecraftBox(0.9, 0.18, 0.22, 12, 22, 8, 2, 2, 64, 64, ribMat);
-    r1.position.set(0, 1.6, 0.02);
-    root.add(r1);
-
-    const r2 = createMinecraftBox(0.75, 0.18, 0.22, 12, 22, 8, 2, 2, 64, 64, ribMat);
-    r2.position.set(0, 1.35, 0.02);
-    root.add(r2);
-
-    const r3 = createMinecraftBox(0.6, 0.18, 0.22, 12, 22, 8, 2, 2, 64, 64, ribMat);
-    r3.position.set(0, 1.1, 0.02);
-    root.add(r3);
-
-    // Tail (3x6x3)
-    const tail = createMinecraftBox(0.25, 0.6, 0.25, 0, 35, 3, 6, 3, 64, 64, mat);
-    tail.position.set(0, 0.55, 0);
-    root.add(tail);
-
-    return {
-      root,
-      targetHeight: 2.7,
-      radius: 0.95
-    };
   }
 
   createFallbackTemplate(type, height) {
@@ -286,7 +123,6 @@ export class MobManager {
     }
 
     const tmpl = this.templates[type];
-    // Native three.js clone: completely bug-free and instant
     const group = tmpl.root.clone(true);
 
     // Deep clone materials so damage flash affects only this individual mob
@@ -323,7 +159,7 @@ export class MobManager {
       pointValue = 150;
     } else if (type === 'skeleton') {
       maxHealth = 25;
-      speed = 1.9 * (difficulty.mobSpeedMultiplier || 1);
+      speed = 2.1 * (difficulty.mobSpeedMultiplier || 1);
       pointValue = 200;
     } else if (type === 'wither') {
       maxHealth = 180 * (difficulty.bossHealthMultiplier || 1);
@@ -346,7 +182,7 @@ export class MobManager {
       pointValue,
       state: 'walking',
       fuseTimer: 0,
-      shootTimer: 2.2 + Math.random() * 2.0,
+      shootTimer: 2.0 + Math.random() * 1.5,
       flashTimer: 0,
       deathTimer: 0,
       wobblePhase: Math.random() * Math.PI * 2,
@@ -512,28 +348,21 @@ export class MobManager {
       else if (mob.type === 'skeleton') {
         const distZ = mob.group.position.z;
 
-        if (distZ < -11.0) {
+        // Advances closer to the village barrier (-4.5m) so the player can comfortably reach and slice with the sword!
+        if (distZ < -4.5) {
           mob.group.position.z += mob.speed * delta;
           mob.group.rotation.z = wobble * 0.5;
-          if (mob.group.children[4] && mob.group.children[5]) {
-            mob.group.children[4].rotation.x = Math.sin(mob.wobblePhase) * 0.4;
-            mob.group.children[5].rotation.x = -Math.sin(mob.wobblePhase) * 0.4;
-          }
         } else {
-          // In shooting range!
+          // In combat & shooting range!
           mob.group.rotation.z = 0;
-          if (mob.group.children[4] && mob.group.children[5]) {
-            mob.group.children[4].rotation.x = 0;
-            mob.group.children[5].rotation.x = 0;
-          }
           mob.shootTimer -= delta;
 
           if (mob.shootTimer <= 0) {
-            mob.shootTimer = 2.4 + Math.random() * 1.2;
+            mob.shootTimer = 2.2 + Math.random() * 1.4;
             this.sounds.playSkeletonShot();
 
             const arrowOrigin = mob.group.position.clone();
-            arrowOrigin.y += 1.4;
+            arrowOrigin.y += 1.3;
             const targetPos = new THREE.Vector3(playerPos.x, 0.4, 0);
 
             this.world.spawnArrow(arrowOrigin, targetPos, () => {
@@ -547,7 +376,7 @@ export class MobManager {
 
       // --- WITHER BOSS BEHAVIOR ---
       else if (mob.type === 'wither') {
-        mob.group.position.z = Math.min(-12, mob.group.position.z + mob.speed * delta);
+        mob.group.position.z = Math.min(-7.5, mob.group.position.z + mob.speed * delta);
         mob.group.position.x = Math.sin(Date.now() * 0.0015) * 4.5;
         mob.group.position.y = 3.6 + Math.cos(Date.now() * 0.0025) * 0.8;
 
@@ -582,6 +411,7 @@ export class MobManager {
       }
     }
 
+    // 1. Direct mesh raycast intersection
     const intersects = raycaster.intersectObjects(candidateMeshes, false);
     if (intersects.length > 0) {
       const hitMesh = intersects[0].object;
@@ -590,6 +420,33 @@ export class MobManager {
         mob,
         point: intersects[0].point,
         distance: intersects[0].distance
+      };
+    }
+
+    // 2. Generous melee sweep detection for comfortable sword combat
+    let closestMob = null;
+    let closestDist = Infinity;
+    let hitPoint = null;
+
+    for (const mob of this.activeMobs) {
+      if (mob.state === 'dead') continue;
+      const center = mob.group.position.clone();
+      center.y += 1.0;
+      const distToRay = raycaster.ray.distanceToPoint(center);
+      const distFromCam = raycaster.ray.origin.distanceTo(center);
+
+      if (distToRay < 0.95 && distFromCam < closestDist && distFromCam <= 16.0) {
+        closestDist = distFromCam;
+        closestMob = mob;
+        hitPoint = center;
+      }
+    }
+
+    if (closestMob) {
+      return {
+        mob: closestMob,
+        point: hitPoint,
+        distance: closestDist
       };
     }
 
