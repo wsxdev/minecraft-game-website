@@ -1,0 +1,11 @@
+Model Information:
+* title:	Minecraft Creeper
+* source:	https://sketchfab.com/3d-models/minecraft-creeper-c986450b4d884c2c94c0d3168671c543
+* author:	keithandmarchant (https://sketchfab.com/nebraskabirdwatching)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Minecraft Creeper" (https://sketchfab.com/3d-models/minecraft-creeper-c986450b4d884c2c94c0d3168671c543) by keithandmarchant (https://sketchfab.com/nebraskabirdwatching) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

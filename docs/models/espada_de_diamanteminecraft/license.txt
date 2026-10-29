@@ -1,0 +1,11 @@
+Model Information:
+* title:	Espada de diamante(Minecraft)
+* source:	https://sketchfab.com/3d-models/espada-de-diamanteminecraft-a827ec37fae04f1d8ebdd625ffa95827
+* author:	guattroogg (https://sketchfab.com/sebaceron.3.0)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Espada de diamante(Minecraft)" (https://sketchfab.com/3d-models/espada-de-diamanteminecraft-a827ec37fae04f1d8ebdd625ffa95827) by guattroogg (https://sketchfab.com/sebaceron.3.0) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

@@ -1,0 +1,11 @@
+Model Information:
+* title:	Minecraft Skeleton
+* source:	https://sketchfab.com/3d-models/minecraft-skeleton-85cefd24a7cb4cf7a8392440a375a0e4
+* author:	None (https://sketchfab.com/None_Yaroslav)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Minecraft Skeleton" (https://sketchfab.com/3d-models/minecraft-skeleton-85cefd24a7cb4cf7a8392440a375a0e4) by None (https://sketchfab.com/None_Yaroslav) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
