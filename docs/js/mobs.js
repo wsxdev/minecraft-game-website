@@ -85,6 +85,9 @@ export class MobManager {
 
     if (loadedCount === list.length) {
       this.isLoaded = true;
+      if (this.onLoadedCallback) {
+        this.onLoadedCallback();
+      }
     }
   }
 

@@ -184,23 +184,23 @@ export class DiamondSword {
         // 0 -> 0.28: windup back
         // 0.28 -> 0.65: fierce downward slash & forward sweep
         // 0.65 -> 1.0: return to ready position
-        if (p < 0.28) {
-          const t = p / 0.28;
-          this.pivot.rotation.x = this.idleRot.x - 0.25 * t;
-          this.pivot.rotation.y = this.idleRot.y + 0.15 * t;
-          this.pivot.rotation.z = this.idleRot.z + 0.3 * t;
+        if (p < 0.25) {
+          const t = p / 0.25;
+          this.pivot.rotation.x = this.idleRot.x - 0.3 * t;
+          this.pivot.rotation.y = this.idleRot.y + 0.3 * t;
+          this.pivot.rotation.z = this.idleRot.z + 0.2 * t;
         } else if (p < 0.65) {
-          const t = (p - 0.28) / 0.37;
+          const t = (p - 0.25) / 0.4;
           const ease = Math.sin(t * Math.PI * 0.5);
-          this.pivot.rotation.x = (this.idleRot.x - 0.25) + 1.25 * ease;
-          this.pivot.rotation.y = (this.idleRot.y + 0.15) - 0.7 * ease;
-          this.pivot.rotation.z = (this.idleRot.z + 0.3) - 1.1 * ease;
+          this.pivot.rotation.x = (this.idleRot.x - 0.3) + 1.4 * ease;
+          this.pivot.rotation.y = (this.idleRot.y + 0.3) - 1.2 * ease;
+          this.pivot.rotation.z = (this.idleRot.z + 0.2) - 0.8 * ease;
         } else {
           const t = (p - 0.65) / 0.35;
           const ease = Math.cos(t * Math.PI * 0.5);
-          this.pivot.rotation.x = this.idleRot.x + 1.0 * ease;
-          this.pivot.rotation.y = this.idleRot.y - 0.55 * ease;
-          this.pivot.rotation.z = this.idleRot.z - 0.8 * ease;
+          this.pivot.rotation.x = this.idleRot.x + 1.1 * ease;
+          this.pivot.rotation.y = this.idleRot.y - 0.9 * ease;
+          this.pivot.rotation.z = this.idleRot.z - 0.6 * ease;
         }
       }
     } else {

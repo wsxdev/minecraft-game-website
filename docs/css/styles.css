@@ -582,6 +582,11 @@ body {
   transform: translateY(1px);
 }
 
+.mc-btn-large:disabled {
+  filter: grayscale(0.8) opacity(0.7);
+  cursor: not-allowed;
+}
+
 /* STATS SUMMARY IN GAME OVER / VICTORY */
 .stats-summary {
   display: grid;

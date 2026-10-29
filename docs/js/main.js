@@ -137,6 +137,16 @@ class MinecraftGame {
     this.sword = new DiamondSword(this.camera, sounds);
     this.mobManager = new MobManager(this.scene, this.world, sounds);
 
+    const startBtn = document.getElementById('start-btn');
+    if (!this.mobManager.isLoaded) {
+      startBtn.disabled = true;
+      startBtn.textContent = '⏳ CARGANDO RECURSOS...';
+      this.mobManager.onLoadedCallback = () => {
+        startBtn.disabled = false;
+        startBtn.textContent = '⚔️ INICIAR DEFENSA';
+      };
+    }
+
     // Mob callbacks
     this.mobManager.onPlayerDamage = (amount, source) => {
       this.takePlayerDamage(amount, source);
