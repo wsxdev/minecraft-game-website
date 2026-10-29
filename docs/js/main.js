@@ -160,6 +160,20 @@ class MinecraftGame {
     this.mobManager.onMobKilled = (mob, isCritical) => {
       this.handleMobKilled(mob, isCritical);
     };
+
+    this.bossBarContainer = document.getElementById('boss-bar-container');
+    this.bossBarFill = document.getElementById('boss-bar-fill');
+
+    this.mobManager.onBossHealthChange = (health, maxHealth, isAlive) => {
+      if (!this.bossBarContainer) return;
+      if (!isAlive || health <= 0) {
+        this.bossBarContainer.classList.remove('visible');
+      } else {
+        this.bossBarContainer.classList.add('visible');
+        const pct = Math.max(0, Math.min(100, (health / maxHealth) * 100));
+        this.bossBarFill.style.width = `${pct}%`;
+      }
+    };
   }
 
   initEventListeners() {
@@ -380,6 +394,7 @@ class MinecraftGame {
     this.camera.rotation.set(0, 0, 0, 'YXZ');
 
     this.mobManager.clearAll();
+    if (this.bossBarContainer) this.bossBarContainer.classList.remove('visible');
     this.updateHUD();
     this.prepareWave(this.currentWave);
 
@@ -410,6 +425,7 @@ class MinecraftGame {
     this.state = 'menu';
     this.exitPointerLock();
     this.mobManager.clearAll();
+    if (this.bossBarContainer) this.bossBarContainer.classList.remove('visible');
     this.hideAllModals();
     this.startModal.classList.add('active');
     this.announceA11y('Menú principal.');
@@ -453,10 +469,10 @@ class MinecraftGame {
         this.waveMobsToSpawn.push('skeleton');
       }
     } else if (waveNum >= 5) {
-      for (let i = 0; i < Math.floor(8 * countMultiplier); i++) {
+      // Wave 5: WITHER BOSS BATTLE!
+      this.waveMobsToSpawn.push('wither');
+      for (let i = 0; i < Math.floor(4 * countMultiplier); i++) {
         this.waveMobsToSpawn.push('creeper');
-      }
-      for (let i = 0; i < Math.floor(6 * countMultiplier); i++) {
         this.waveMobsToSpawn.push('skeleton');
       }
     }
@@ -530,6 +546,10 @@ class MinecraftGame {
     if (mob.type === 'creeper') {
       this.showFloatingText(window.innerWidth / 2, window.innerHeight * 0.45, '¡CREEPER ELIMINADO! +XP', 'defuse');
       this.announceA11y('Creeper eliminado');
+    } else if (mob.type === 'wither') {
+      this.showFloatingText(window.innerWidth / 2, window.innerHeight * 0.35, '¡WITHER DERROTADO! +1500 XP', 'crit');
+      this.announceA11y('¡El Wither ha sido derrotado! Victoria inminente.');
+      sounds.playLevelUp();
     } else {
       this.showFloatingText(window.innerWidth / 2, window.innerHeight * 0.45, '¡ESQUELETO DERROTADO!', 'defuse');
       this.announceA11y('Esqueleto eliminado');

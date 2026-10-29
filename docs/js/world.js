@@ -155,34 +155,7 @@ export class World {
   }
 
   initBarrierAndTorches() {
-    // Cobblestone textured barrier / wall
-    const cobbleCanvas = document.createElement('canvas');
-    cobbleCanvas.width = 32;
-    cobbleCanvas.height = 32;
-    const cctx = cobbleCanvas.getContext('2d');
-    const grays = ['#5a5a5a', '#6d6d6d', '#484848', '#7b7b7b', '#3b3b3b'];
-    for (let x = 0; x < 32; x += 4) {
-      for (let y = 0; y < 32; y += 4) {
-        cctx.fillStyle = grays[Math.floor(Math.random() * grays.length)];
-        cctx.fillRect(x, y, 4, 4);
-      }
-    }
-    cctx.strokeStyle = '#292929';
-    cctx.strokeRect(0, 0, 32, 32);
-
-    const cobbleTex = new THREE.CanvasTexture(cobbleCanvas);
-    cobbleTex.wrapS = THREE.RepeatWrapping;
-    cobbleTex.wrapT = THREE.RepeatWrapping;
-    cobbleTex.repeat.set(8, 1);
-    cobbleTex.magFilter = THREE.NearestFilter;
-
-    const wallMat = new THREE.MeshLambertMaterial({ map: cobbleTex });
-    const wallGeo = new THREE.BoxGeometry(16, 1.2, 0.8);
-    const wall = new THREE.Mesh(wallGeo, wallMat);
-    wall.position.set(0, -0.6, -2.5);
-    this.scene.add(wall);
-
-    // Torches on Left and Right posts
+    // Torches on Left and Right posts (completely clear view, zero walls!)
     [-4.5, 4.5].forEach((xPos) => {
       // Wood post
       const postGeo = new THREE.BoxGeometry(0.5, 2.4, 0.5);

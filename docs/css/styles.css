@@ -100,6 +100,49 @@ body {
   40%, 60% { transform: translate3d(5px, -4px, 0); }
 }
 
+/* TOP WITHER BOSS BAR */
+#boss-bar-container {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  width: min(540px, 85vw);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+#boss-bar-container.visible {
+  display: flex;
+}
+
+.boss-title {
+  font-size: 11px;
+  color: #ff55ff;
+  text-shadow: 2px 2px #3f003f;
+  letter-spacing: 1px;
+}
+
+.boss-bar-frame {
+  width: 100%;
+  height: 16px;
+  background: #180518;
+  border: 3px solid #000000;
+  box-shadow: inset 2px 2px #3f003f, inset -2px -2px #5f005f;
+  position: relative;
+  padding: 2px;
+}
+
+.boss-bar-fill {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, #d844d8 0%, #a01aa0 50%, #680568 100%);
+  transition: width 0.15s ease-out;
+}
+
 /* TOP HUD BAR */
 #top-hud {
   position: absolute;
